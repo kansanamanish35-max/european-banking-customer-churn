@@ -31,13 +31,24 @@ df = df.dropna(subset=["Balance","EstimatedSalary","NumOfProducts","Exited","IsA
 df["Exited"] = df["Exited"].astype(int)
 df["IsActiveMember"] = df["IsActiveMember"].astype(int)
 df["Product Depth Index"] = (df["NumOfProducts"] / max(df["NumOfProducts"].max(),1) * 100).clip(0,100)
+high_balance_cut = df["Balance"].quantile(0.75)
+
 df["Engagement Profile"] = np.select(
-    [(df.IsActiveMember.eq(1)&df.NumOfProducts.ge(2)),
-     (df.IsActiveMember.eq(0)&df.Balance.ge(df.Balance.quantile(.75))),
-     (df.IsActiveMember.eq(1)&df.NumOfProducts.eq(1)),
-     df.IsActiveMember.eq(0)],
-    ["Active & Multi-Product","Inactive High-Balance","Active Single-Product","Inactive"],
-    default="Other Active")
+    [
+        (df["IsActiveMember"].eq(1) & df["NumOfProducts"].ge(2)),
+        (df["IsActiveMember"].eq(1) & df["NumOfProducts"].lt(2)),
+        (df["IsActiveMember"].eq(0) & df["Balance"].ge(high_balance_cut)),
+        (df["IsActiveMember"].eq(0) & df["Balance"].lt(high_balance_cut)),
+    ],
+    [
+        "Active & Multi-Product",
+        "Active & Low-Product",
+        "Inactive High-Balance",
+        "Inactive Other",
+    ],
+    default="Needs Review"
+)
+  
 depth = df.NumOfProducts.map({1:25,2:70,3:100,4:100}).fillna(25)
 df["Relationship Strength Index"] = (.40*df.IsActiveMember*100 + .35*depth + .25*df.HasCrCard.fillna(0)*100).round(1)
 
